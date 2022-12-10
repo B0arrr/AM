@@ -2,11 +2,12 @@ import axios from 'axios';
 import React, {useEffect, useState} from 'react';
 import MapView, {Marker} from 'react-native-maps';
 import {Button, Modal, StyleSheet, View, Text} from 'react-native';
-import Geolocation from '@react-native-community/geolocation';
+import * as Location from 'expo-location';
+import {LocationAccuracy} from "expo-location";
 
 export default function App() {
     const [markers, setMarkers] = useState();
-    const [visited, setVisited] = useState();
+    const [visited, setVisited] = useState([]);
     const [position, setPosition] = useState();
     const [isModalVisible, setModalVisible] = useState(false);
     const [task, setTask] = useState();
@@ -26,20 +27,13 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        Geolocation.watchPosition((position) => {
-                const {latitude, longitude} = position.coords;
-
-                setPosition({latitude: latitude, longitude: longitude});
-            },
-            err => console.log(err),
-            {enableHighAccuracy: true, timeout: 20000, maximumAge: 1000})
+        watchPosition();
     }, []);
 
     useEffect(() => {
         markers?.forEach((marker) => {
-            const waypoint = {latitude: marker.latitude, longitude: marker.longitude};
-
-            if (calculateDistance(waypoint, position) <= 100) {
+            const waypoint = {latitude: marker.Latitude, longitude: marker.Longitude};
+            if (calculateDistance(waypoint, position) <= 10) {
                 if (!visited?.includes(marker.Name)) {
                     handleModal();
                     setVisited([...visited, marker.Name]);
@@ -49,6 +43,18 @@ export default function App() {
         });
     }, [position]);
 
+    let watchPosition = async () => {
+        await Location.requestForegroundPermissionsAsync();
+        await Location.watchPositionAsync({
+                accuracy: LocationAccuracy.BestForNavigation,
+                distanceInterval: 10
+            },
+            (position) => {
+                const {latitude, longitude} = position.coords;
+
+                setPosition({latitude: latitude, longitude: longitude});
+            });
+    }
     let calculateDistance = (x, y) => {
         const R = 6371e3;
         const φ1 = x.latitude * Math.PI / 180;
@@ -63,7 +69,7 @@ export default function App() {
 
         return R * c;
     }
-    let handleModal = () => setModalVisible(!isModalVisible);
+    let handleModal = () => setModalVisible(() => !isModalVisible);
 
 //
     return (
@@ -84,7 +90,7 @@ export default function App() {
                     title={marker.Name}/>)
                 }
             </MapView>
-            <Modal isVisible={isModalVisible}>
+            <Modal visible={isModalVisible}>
                 <View style={{flex: 1}}>
                     <Text>{task}</Text>
                     <Button title="OK" onPress={handleModal}/>
